@@ -10,11 +10,14 @@ import '../project_specific/comman_search_field.dart';
 import '../project_specific/map_type_sheet.dart';
 
 class DirectionPage extends StatefulWidget {
-  const DirectionPage({super.key});
+  // આ બે લાઈન અને કન્સ્ટ્રક્ટર માં ફેરફાર કર્યો
+  final LatLng? destinationLocation;
+  final String? destinationName;
+
+  const DirectionPage({super.key, this.destinationLocation, this.destinationName});
 
   @override
   State<DirectionPage> createState() => _DirectionPageState();
-
 }
 
 class _DirectionPageState extends State<DirectionPage> {
@@ -40,7 +43,22 @@ class _DirectionPageState extends State<DirectionPage> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (widget.destinationLocation != null) {
+        twomap.useCurrentLocation(true, startController);
+        endController.text = widget.destinationName ?? "Selected Destination";
+        String destinationString = "${widget.destinationLocation!.latitude},${widget.destinationLocation!.longitude}";
+        await twomap.setPoint(destinationString, false);
+        _tileController.collapse();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    twomap.clearRouteInfo();
     startController.dispose();
     endController.dispose();
     _debounceStart?.cancel();
@@ -172,7 +190,7 @@ class _DirectionPageState extends State<DirectionPage> {
               ),
               child: ExpansionTile(
                 controller: _tileController,
-                initiallyExpanded: true,
+                initiallyExpanded: widget.destinationLocation == null,
                 tilePadding: const EdgeInsets.symmetric(horizontal: 10),
                 childrenPadding: EdgeInsets.zero,
                 title: Row(
@@ -255,7 +273,6 @@ class _DirectionPageState extends State<DirectionPage> {
               ),
             ),
           ),
-
 
           Positioned(
             bottom: 30,

@@ -4,14 +4,15 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../constant/colorconstant.dart';
 import '../controller/mapController.dart';
+import '../controller/place_details_Controller.dart';
 import '../controller/search_listController.dart';
 import '../project_specific/comman_search_field.dart';
 import '../project_specific/map_type_sheet.dart';
+import '../project_specific/place_details_sheet.dart';
 import 'direction_page.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
-
   @override
   State<MapPage> createState() => _MapPageState();
 }
@@ -20,7 +21,10 @@ class _MapPageState extends State<MapPage> {
   final MapController map = Get.find<MapController>();
   final SuggestionController placeController = Get.put(SuggestionController());
   final TextEditingController searchController = TextEditingController();
+  final PlaceDetailController detailCtrl = Get.put(PlaceDetailController());
+  RxList<Marker> markers = <Marker>[].obs;
 
+  Key mapKey = UniqueKey();
   Timer? _debounce;
 
   static const CameraPosition _initialPosition = CameraPosition(
@@ -44,7 +48,6 @@ class _MapPageState extends State<MapPage> {
 
   @override
   Widget build(BuildContext context) {
-    Key mapKey = UniqueKey();
     return Scaffold(
       backgroundColor: ColorConstant.whiteColor,
       body: SafeArea(
@@ -63,6 +66,20 @@ class _MapPageState extends State<MapPage> {
                 map.goToCurrentLocation();
               },
               myLocationEnabled: true,
+              onTap: (LatLng latLng) async {
+                await detailCtrl.getDetailsFromLatLng(latLng.latitude, latLng.longitude);
+                if (detailCtrl.placeData.isNotEmpty) {
+                  map.markers.clear();
+                  map.markers.add(Marker(
+                    markerId: const MarkerId("selected_place"),
+                    position: LatLng(
+                        detailCtrl.placeData['geometry']['location']['lat'],
+                        detailCtrl.placeData['geometry']['location']['lng']
+                    ),
+                  ));
+                  Get.bottomSheet(PlaceDetailBottomSheet(), isScrollControlled: true);
+                }
+              },
             )),
 
             Positioned(
@@ -112,11 +129,20 @@ class _MapPageState extends State<MapPage> {
                           final suggestion = placeController.suggestions[index];
                           return ListTile(
                             title: Text(suggestion),
-                            onTap: () async {
-                              searchController.text = suggestion;
-                              placeController.clearSuggestions();
-                              await map.searchAndPinCity(suggestion);
-                            },
+                              onTap: () async {
+                                searchController.text = suggestion;
+                                placeController.clearSuggestions();
+                                bool success = await detailCtrl.getFamousPlaceOfCity(suggestion);
+
+                                if (success) {
+                                  var loc = detailCtrl.placeData['geometry']['location'];
+                                  map.googleMapController?.animateCamera(
+                                    CameraUpdate.newLatLngZoom(LatLng(loc['lat'], loc['lng']), 16),
+                                  );
+
+                                  Get.bottomSheet(PlaceDetailBottomSheet(), isScrollControlled: true);
+                                }
+                              }
                           );
                         },
                       ),
@@ -150,7 +176,6 @@ class _MapPageState extends State<MapPage> {
               ),
             ),
 
-
             Positioned(
               bottom: 16,
               right: 10,
@@ -182,5 +207,4 @@ class _MapPageState extends State<MapPage> {
       ),
     );
   }
-
 }
