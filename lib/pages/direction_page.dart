@@ -8,9 +8,10 @@ import '../controller/map_two_locationController.dart';
 import '../controller/search_listController.dart';
 import '../project_specific/comman_search_field.dart';
 import '../project_specific/map_type_sheet.dart';
+import '../project_specific/step_tile.dart';
+import '../project_specific/vehical_select.dart';
 
 class DirectionPage extends StatefulWidget {
-  // આ બે લાઈન અને કન્સ્ટ્રક્ટર માં ફેરફાર કર્યો
   final LatLng? destinationLocation;
   final String? destinationName;
 
@@ -21,11 +22,13 @@ class DirectionPage extends StatefulWidget {
 }
 
 class _DirectionPageState extends State<DirectionPage> {
+
   final TwoMapRouteController twomap = Get.find();
   final MapController map = Get.find<MapController>();
 
   final SuggestionController startSuggestionController =
   Get.put(SuggestionController(), tag: "start");
+
   final SuggestionController endSuggestionController =
   Get.put(SuggestionController(), tag: "end");
 
@@ -45,12 +48,17 @@ class _DirectionPageState extends State<DirectionPage> {
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (widget.destinationLocation != null) {
-        twomap.useCurrentLocation(true, startController);
-        endController.text = widget.destinationName ?? "Selected Destination";
-        String destinationString = "${widget.destinationLocation!.latitude},${widget.destinationLocation!.longitude}";
-        await twomap.setPoint(destinationString, false);
+
+        await twomap.useCurrentLocation(true, startController);
+
+        endController.text =
+            widget.destinationName ?? "Selected Destination";
+
+        await twomap.setPoint(widget.destinationLocation!, false);
+
         _tileController.collapse();
       }
     });
@@ -80,51 +88,83 @@ class _DirectionPageState extends State<DirectionPage> {
     });
   }
 
-  Widget _buildSuggestionList(
-      TextEditingController controller, SuggestionController suggestionCtrl) {
+  Widget _buildTransportModeItem(IconData icon, String mode) {
     return Obx(() {
-      if (suggestionCtrl.isLoading.value) {
-        return Container(
-          margin: const EdgeInsets.only(top: 5),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: ColorConstant.whiteColor,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Center(child: CircularProgressIndicator()),
-        );
-      }
+      bool isSelected = twomap.selectedMode.value == mode;
+      return GestureDetector(
+        onTap: () async {
+          await twomap.updateTravelMode(mode);
+        },
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: isSelected
+                  ? ColorConstant.secondary
+                  : Colors.grey,
+              size: 28,
+            ),
 
-      if (suggestionCtrl.suggestions.isEmpty) return const SizedBox();
+            const SizedBox(height: 4),
+
+            if (isSelected)
+              Text(
+                twomap.durationText.value,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: ColorConstant.secondary,
+                ),
+              ),
+
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 3,
+              width: isSelected ? 30 : 0,
+              decoration: BoxDecoration(
+                color: ColorConstant.secondary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            )
+          ],
+        ),
+      );
+    });
+  }
+
+
+  Widget _buildSuggestionList(
+      TextEditingController controller,
+      SuggestionController suggestionCtrl) {
+
+    return Obx(() {
+
+      if (!suggestionCtrl.isLoading.value &&
+          suggestionCtrl.suggestions.isEmpty) {
+        return const SizedBox();
+      }
 
       return Container(
         margin: const EdgeInsets.only(top: 5),
         decoration: BoxDecoration(
           color: ColorConstant.whiteColor,
           borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: ColorConstant.blackColor.withValues(alpha: 0.1),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
+          boxShadow: const [
+            BoxShadow(color: Colors.black12, blurRadius: 5)
           ],
         ),
-        constraints: const BoxConstraints(maxHeight: 200),
-        child: ListView.separated(
+        constraints: const BoxConstraints(maxHeight: 180),
+        child: ListView.builder(
           shrinkWrap: true,
           itemCount: suggestionCtrl.suggestions.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final suggestion = suggestionCtrl.suggestions[index];
-            return ListTile(
-              title: Text(suggestion),
-              onTap: () {
-                controller.text = suggestion;
-                suggestionCtrl.clearSuggestions();
-              },
-            );
-          },
+          itemBuilder: (context, index) => ListTile(
+            title: Text(suggestionCtrl.suggestions[index]),
+            onTap: () {
+              controller.text =
+              suggestionCtrl.suggestions[index];
+              suggestionCtrl.clearSuggestions();
+            },
+          ),
         ),
       );
     });
@@ -132,9 +172,11 @@ class _DirectionPageState extends State<DirectionPage> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       body: Stack(
         children: [
+
           Obx(() => GoogleMap(
             initialCameraPosition: _initialPosition,
             mapType: map.currentMapType.value,
@@ -142,34 +184,37 @@ class _DirectionPageState extends State<DirectionPage> {
             polylines: Set<Polyline>.of(twomap.polylines),
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
+            myLocationEnabled: true,
             onMapCreated: (controller) {
               twomap.mapController = controller;
               map.googleMapController = controller;
               map.goToCurrentLocation();
             },
-            myLocationEnabled: true,
           )),
 
           Positioned(
-            top: 150,
+            top: 120,
             right: 15,
             child: FloatingActionButton.small(
               heroTag: "dirMapTypeBtn",
               backgroundColor: Colors.white,
-              onPressed: () {
-                Get.bottomSheet(const MapTypeSheet());
-              },
-              child: const Icon(Icons.layers_outlined, color: Colors.black87),
+              onPressed: () =>
+                  Get.bottomSheet(const MapTypeSheet()),
+              child: const Icon(Icons.layers_outlined,
+                  color: ColorConstant.secondary),
             ),
           ),
+
           Positioned(
-            bottom: 40,
+            top: 170,
             right: 15,
             child: FloatingActionButton.small(
-              heroTag: "dirMyLocationBtn",
-              backgroundColor: ColorConstant.whiteColor,
-              onPressed: () => map.goToCurrentLocation(),
-              child: const Icon(Icons.my_location, color: ColorConstant.secondary),
+              heroTag: "myLocationBtn",
+              backgroundColor: Colors.white,
+              onPressed: () =>
+                  map.goToCurrentLocation(),
+              child: const Icon(Icons.my_location,
+                  color: ColorConstant.secondary),
             ),
           ),
 
@@ -181,53 +226,48 @@ class _DirectionPageState extends State<DirectionPage> {
               decoration: BoxDecoration(
                 color: ColorConstant.whiteColor,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 8,
-                    color: ColorConstant.blackColor.withValues(alpha: 0.2),
-                  )
+                boxShadow: const [
+                  BoxShadow(blurRadius: 8,
+                      color: Colors.black12)
                 ],
               ),
               child: ExpansionTile(
                 controller: _tileController,
-                initiallyExpanded: widget.destinationLocation == null,
-                tilePadding: const EdgeInsets.symmetric(horizontal: 10),
-                childrenPadding: EdgeInsets.zero,
-                title: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        twomap.clearRouteInfo();
-                        Get.back();
-                      },
-                      icon: const Icon(Icons.arrow_back),
-                    ),
-                    const SizedBox(width: 5),
-                    const Text(
-                      "Directions",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                initiallyExpanded:
+                widget.destinationLocation == null,
+                leading: IconButton(
+                  onPressed: () {
+                    twomap.clearRouteInfo();
+                    Get.back();
+                  },
+                  icon: const Icon(Icons.arrow_back),
                 ),
+                title: const Text("Directions",
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold)),
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 10),
                     child: Column(
                       children: [
+
                         CommanSearchField(
                           searchcontroller: startController,
                           hintText: "Enter starting point",
                           onSearch: _onStartChanged,
                           prefixicon: Icons.circle_outlined,
                           suffixicon: Icons.pin_drop,
-                          onSuffixTap: () {
-                            twomap.useCurrentLocation(true, startController);
-                          },
+                          onSuffixTap: () =>
+                              twomap.useCurrentLocation(
+                                  true,
+                                  startController),
                         ),
-                        _buildSuggestionList(startController, startSuggestionController),
+
+                        _buildSuggestionList(
+                            startController,
+                            startSuggestionController),
 
                         const SizedBox(height: 10),
 
@@ -236,36 +276,45 @@ class _DirectionPageState extends State<DirectionPage> {
                           hintText: "Enter destination",
                           onSearch: _onEndChanged,
                           prefixicon: Icons.location_on,
-                          prefixcolor: ColorConstant.redColor,
+                          prefixcolor: Colors.red,
                         ),
-                        _buildSuggestionList(endController, endSuggestionController),
+
+                        _buildSuggestionList(
+                            endController,
+                            endSuggestionController),
 
                         const SizedBox(height: 15),
 
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: ColorConstant.secondary,
-                            minimumSize: const Size(double.infinity, 50),
+                            backgroundColor:
+                            ColorConstant.secondary,
+                            minimumSize:
+                            const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                                borderRadius:
+                                BorderRadius.circular(12)),
                           ),
                           onPressed: () async {
                             if (startController.text.isNotEmpty && endController.text.isNotEmpty) {
-                              if (startController.text != "Your Location") {
-                                await twomap.setPoint(startController.text, true);
+                              if (startController.text == "Your Location") {
+                                // useCurrentLocation already sets the start LatLng
+                              } else {
+                                await twomap.setPointFromAddress(startController.text, true);
                               }
-                              if (endController.text != "Your Location") {
-                                await twomap.setPoint(endController.text, false);
+
+                              if (endController.text == "Your Location") {
+                                // logic for end current location if needed
+                              } else {
+                                await twomap.setPointFromAddress(endController.text, false);
                               }
                               _tileController.collapse();
-                            } else {
-                              Get.snackbar("Error", "Please enter both locations");
                             }
-
                           },
                           child: const Text("Show Route",
-                            style: TextStyle(color:ColorConstant.whiteColor ),),
+                              style: TextStyle(
+                                  color: Colors.white)),
                         ),
-
-                        const SizedBox(height: 15),
                       ],
                     ),
                   ),
@@ -274,49 +323,130 @@ class _DirectionPageState extends State<DirectionPage> {
             ),
           ),
 
-          Positioned(
-            bottom: 30,
-            left: 20,
-            child: Obx(() {
-              if (twomap.distanceText.value.isEmpty) {
-                return const SizedBox();
-              }
+          Obx(() {
 
-              return Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: ColorConstant.whiteColor,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: 6,
-                      color: ColorConstant.blackColor.withValues(alpha: 0.2),
-                    )
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Distance: ${twomap.distanceText.value}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+            if (twomap.distanceText.value.isEmpty)
+              return const SizedBox();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.35,
+              minChildSize: 0.15,
+              maxChildSize: 0.85,
+              builder: (context, scrollController) {
+
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius:
+                    BorderRadius.vertical(
+                        top: Radius.circular(25)),
+                    boxShadow: [
+                      BoxShadow(
+                          blurRadius: 15,
+                          color: Colors.black26)
+                    ],
+                  ),
+                  child: ListView(
+                    controller: scrollController,
+                    children: [
+
+                      Align(
+                        alignment:AlignmentGeometry.topRight,
+                        child: IconButton(
+                          icon: const Icon(Icons.settings),
+                          onPressed: () {
+                            Get.bottomSheet(
+                                VehicleSelectorSheet());
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      "Time: ${twomap.durationText.value}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildTransportModeItem(Icons.directions_car, 'driving'),
+                            _buildTransportModeItem(Icons.directions_bike, 'bicycling'),
+                            _buildTransportModeItem(Icons.directions_train, 'transit'),
+                            _buildTransportModeItem(Icons.directions_walk, 'walking'),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ),
+
+                      const Divider(),
+
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  twomap.durationText.value,
+                                  style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green),
+                                ),
+                                Text(
+                                  "${twomap.distanceText.value} • Fastest route",
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+
+                            ElevatedButton.icon(
+                              onPressed: () {},
+                              icon: const Icon(Icons.navigation,
+                                  color: Colors.white),
+                              label: const Text("Start",
+                                  style: TextStyle(
+                                      color: Colors.white)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                ColorConstant.secondary,
+                                shape: const StadiumBorder(),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+
+                      const Divider(),
+
+                      const Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10),
+                        child: Text("Steps",
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold)),
+                      ),
+
+                      Obx(() => Column(
+                        children: twomap.stepsList
+                            .map((step) {
+                          return StepTileWidget(
+                            instruction: step["instruction"],
+                            distance: step["distance"],
+                            maneuver: step["maneuver"],
+                          );
+                        }).toList(),
+                      )),
+
+                      const SizedBox(height: 50),
+                    ],
+                  ),
+                );
+              },
+            );
+          }),
         ],
       ),
     );

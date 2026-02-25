@@ -10,17 +10,15 @@ class SuggestionController extends GetxController {
   var isLoading = false.obs;
 
   Future<void> searchPlace(String input) async {
-    if (input.isEmpty) {
+    if (input.trim().length < 3) {
       suggestions.clear();
       return;
     }
-
     isLoading.value = true;
-
-    // અહીં types=geocode કાઢી નાખ્યું છે અથવા તમે types=establishment વાપરી શકો
-    // ફક્ત types=geocode હટાવવાથી બધું જ (shops, hotels, hospitals) આવવા માંડશે.
     final url =
-        "https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey";
+        "https://maps.googleapis.com/maps/api/place/autocomplete/json?"
+        "input=${Uri.encodeComponent(input)}"
+        "&key=$apiKey";
 
     try {
       final response = await http.get(Uri.parse(url));
@@ -28,6 +26,7 @@ class SuggestionController extends GetxController {
 
       if (data["status"] == "OK") {
         final predictions = data["predictions"] as List;
+
         suggestions.value =
             predictions.map((e) => e["description"].toString()).toList();
       } else {
@@ -39,6 +38,7 @@ class SuggestionController extends GetxController {
       isLoading.value = false;
     }
   }
+
   Future<LatLng?> getLatLngFromAddress(String address) async {
     final url = "https://maps.googleapis.com/maps/api/geocode/json?address=${Uri.encodeComponent(address)}&key=$apiKey";
 

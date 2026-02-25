@@ -41,6 +41,10 @@ class _MapPageState extends State<MapPage> {
 
   void _onSearchChanged(String value) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
+    if (value.trim().length < 3) {
+      placeController.clearSuggestions();
+      return;
+    }
     _debounce = Timer(const Duration(milliseconds: 400), () {
       placeController.searchPlace(value);
     });
@@ -133,14 +137,24 @@ class _MapPageState extends State<MapPage> {
                                 searchController.text = suggestion;
                                 placeController.clearSuggestions();
                                 bool success = await detailCtrl.getFamousPlaceOfCity(suggestion);
-
                                 if (success) {
                                   var loc = detailCtrl.placeData['geometry']['location'];
-                                  map.googleMapController?.animateCamera(
-                                    CameraUpdate.newLatLngZoom(LatLng(loc['lat'], loc['lng']), 16),
+                                  LatLng selectedLatLng =
+                                  LatLng(loc['lat'], loc['lng']);
+                                  map.markers.clear();
+                                  map.markers.add(
+                                    Marker(
+                                      markerId: const MarkerId("searched_place"),
+                                      position: selectedLatLng,
+                                    ),
                                   );
-
-                                  Get.bottomSheet(PlaceDetailBottomSheet(), isScrollControlled: true);
+                                  map.googleMapController?.animateCamera(
+                                    CameraUpdate.newLatLngZoom(selectedLatLng, 16),
+                                  );
+                                  Get.bottomSheet(
+                                    PlaceDetailBottomSheet(),
+                                    isScrollControlled: true,
+                                  );
                                 }
                               }
                           );
@@ -181,7 +195,7 @@ class _MapPageState extends State<MapPage> {
               right: 10,
               child: GestureDetector(
                 onTap: () async {
-                  await Get.to(() => const DirectionPage());
+                  await Get.to(() =>  DirectionPage());
                   setState(() {
                     mapKey = UniqueKey();
                   });
