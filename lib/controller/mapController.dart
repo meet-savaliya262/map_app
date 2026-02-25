@@ -49,8 +49,6 @@
       );
     }
 
-
-
     Future<void> searchAndPinCity(String placeName) async {
       try {
         markers.clear();

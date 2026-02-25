@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../constant/colorconstant.dart';
 import '../controller/mapController.dart';
+import '../controller/map_two_locationController.dart';
 import '../controller/place_details_Controller.dart';
 import '../controller/search_listController.dart';
 import '../project_specific/comman_search_field.dart';
@@ -18,6 +19,7 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
+  final TwoMapRouteController twomap = Get.find<TwoMapRouteController>();
   final MapController map = Get.find<MapController>();
   final SuggestionController placeController = Get.put(SuggestionController());
   final TextEditingController searchController = TextEditingController();
@@ -64,6 +66,7 @@ class _MapPageState extends State<MapPage> {
               myLocationButtonEnabled: false,
               zoomControlsEnabled: false,
               mapToolbarEnabled: false,
+              polylines: twomap.polylines.value,
               markers: {...map.markers},
               onMapCreated: (GoogleMapController controller) {
                 map.googleMapController = controller;
