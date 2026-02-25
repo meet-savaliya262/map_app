@@ -348,6 +348,7 @@ class _DirectionPageState extends State<DirectionPage> {
                   ),
                   child: ListView(
                     controller: scrollController,
+                    padding: EdgeInsets.zero,
                     children: [
 
                       Align(
@@ -401,7 +402,9 @@ class _DirectionPageState extends State<DirectionPage> {
                             ),
 
                             ElevatedButton.icon(
-                              onPressed: () {},
+                              onPressed: () {
+                                twomap.startNavigation();
+                              },
                               icon: const Icon(Icons.navigation,
                                   color: Colors.white),
                               label: const Text("Start",
