@@ -10,6 +10,7 @@ import '../project_specific/comman_search_field.dart';
 import '../project_specific/map_type_sheet.dart';
 import '../project_specific/step_tile.dart';
 import '../project_specific/vehical_select.dart';
+import 'navigationPage.dart';
 
 class DirectionPage extends StatefulWidget {
   final LatLng? destinationLocation;
@@ -298,13 +299,11 @@ class _DirectionPageState extends State<DirectionPage> {
                           onPressed: () async {
                             if (startController.text.isNotEmpty && endController.text.isNotEmpty) {
                               if (startController.text == "Your Location") {
-                                // useCurrentLocation already sets the start LatLng
                               } else {
                                 await twomap.setPointFromAddress(startController.text, true);
                               }
 
                               if (endController.text == "Your Location") {
-                                // logic for end current location if needed
                               } else {
                                 await twomap.setPointFromAddress(endController.text, false);
                               }
@@ -330,7 +329,7 @@ class _DirectionPageState extends State<DirectionPage> {
 
             return DraggableScrollableSheet(
               initialChildSize: 0.35,
-              minChildSize: 0.15,
+              minChildSize: 0.09,
               maxChildSize: 0.85,
               builder: (context, scrollController) {
 
@@ -403,16 +402,16 @@ class _DirectionPageState extends State<DirectionPage> {
 
                             ElevatedButton.icon(
                               onPressed: () {
-                                twomap.startNavigation();
+                                if (twomap.start != null && twomap.end != null) {
+                                  Get.to(() => const NavigationView());
+                                } else {
+                                  Get.snackbar("Error", "Please select start and destination");
+                                }
                               },
-                              icon: const Icon(Icons.navigation,
-                                  color: Colors.white),
-                              label: const Text("Start",
-                                  style: TextStyle(
-                                      color: Colors.white)),
+                              icon: const Icon(Icons.navigation, color: Colors.white),
+                              label: const Text("Start", style: TextStyle(color: Colors.white)),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                ColorConstant.secondary,
+                                backgroundColor: ColorConstant.secondary,
                                 shape: const StadiumBorder(),
                               ),
                             )

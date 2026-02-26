@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geolocator/geolocator.dart';
@@ -7,10 +8,13 @@ import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
-import 'package:map_app/constant/colorconstant.dart';
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
 
 class TwoMapRouteController extends GetxController {
   GoogleMapController? mapController;
+  RxString selectedVehicleIcon = "".obs;
+  RxBool isAutoFollow = true.obs;
 
   var markers = <Marker>{}.obs;
   var polylines = <Polyline>{}.obs;
@@ -20,6 +24,7 @@ class TwoMapRouteController extends GetxController {
   RxString selectedMode = "driving".obs;
   RxString distanceText = "".obs;
   RxString durationText = "".obs;
+
   RxBool isNavigating = false.obs;
   StreamSubscription<Position>? positionStream;
 
@@ -56,9 +61,6 @@ class TwoMapRouteController extends GetxController {
 
       stepsList.clear();
       List<LatLng> detailedCoordinates = [];
-
-      // 🔹 મહત્વનો સુધારો: Overview ની જગ્યાએ દરેક Step ની પોઈન્ટ લાઈન ભેગી કરવી
-      // આનાથી લાઈન રોડના દરેક વળાંક પર પ્રોપર 'Snap to Road' થશે
       for (var step in leg["steps"]) {
         stepsList.add({
           "instruction": step["html_instructions"].replaceAll(RegExp(r'<[^>]*>|&[^;]+;'), ""),
@@ -66,7 +68,6 @@ class TwoMapRouteController extends GetxController {
           "maneuver": step["maneuver"] ?? "straight",
         });
 
-        // દરેક નાના વળાંકના પોઈન્ટ્સ ડિકોડ કરીને લિસ્ટમાં ઉમેરો
         var points = _decodePoly(step["polyline"]["points"]);
         detailedCoordinates.addAll(points);
       }
@@ -96,48 +97,81 @@ class TwoMapRouteController extends GetxController {
 
   void startNavigation() async {
     isNavigating.value = true;
-    markers.removeWhere((m) => m.markerId.value == "start");
+    isAutoFollow.value = true;
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      await Geolocator.requestPermission();
-    }
-    positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 1,
-      ),
-    ).listen((Position position) {
-      LatLng currentLatLng = LatLng(position.latitude, position.longitude);
+    if (polylines.isNotEmpty && polylines.first.points.isNotEmpty) {
+      List<LatLng> routePoints = polylines.first.points.toList();
+      LatLng snapToRoadStart = routePoints.first;
+      double initialHeading = 0.0;
+
+      if (routePoints.length > 1) {
+        initialHeading = Geolocator.bearingBetween(
+            snapToRoadStart.latitude, snapToRoadStart.longitude,
+            routePoints[1].latitude, routePoints[1].longitude
+        );
+      }
 
       mapController?.animateCamera(CameraUpdate.newCameraPosition(
         CameraPosition(
-          target: currentLatLng,
+          target: snapToRoadStart,
           zoom: 19,
-          tilt: 60,
-          bearing: position.heading,
+          tilt: 65,
+          bearing: initialHeading,
         ),
       ));
-      _updateNavigationMarker(currentLatLng, position.heading);
+
+      _updateNavigationMarker(snapToRoadStart, initialHeading);
+    }
+
+    positionStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 0
+      ),
+    ).listen((Position position) {
+      if (position.heading != 0) {
+        _updateNavigationMarker(
+            LatLng(position.latitude, position.longitude),
+            position.heading
+        );
+      }
     });
   }
 
-  void _updateNavigationMarker(LatLng pos, double heading) {
-    markers.removeWhere((m) => m.markerId.value == "nav_arrow");
+  void _updateNavigationMarker(LatLng pos, double heading) async {
+    markers.removeWhere((m) => m.markerId.value == "nav_arrow" || m.markerId.value == "start");
+
+    Uint8List? markerIcon;
+    if (selectedVehicleIcon.value.isNotEmpty) {
+      markerIcon = await getBytesFromAsset(selectedVehicleIcon.value, 110);
+    }
 
     markers.add(
       Marker(
         markerId: const MarkerId("nav_arrow"),
         position: pos,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        rotation: heading,
+        icon: markerIcon != null
+            ? BitmapDescriptor.fromBytes(markerIcon)
+            : BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        rotation: heading + 90,
         flat: true,
         anchor: const Offset(0.5, 0.5),
+        zIndex: 15,
       ),
     );
+
+    if (isAutoFollow.value) {
+      mapController?.animateCamera(CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: pos,
+          zoom: 19,
+          tilt: 65,
+          bearing: heading,
+        ),
+      ));
+    }
     markers.refresh();
   }
-
 
   List<LatLng> _decodePoly(String poly) {
     var list = poly.codeUnits;
@@ -172,15 +206,36 @@ class TwoMapRouteController extends GetxController {
     return res;
   }
 
-  // જુના અન્ય ફંક્શન (SetPoint, UpdateMarkers વગેરે)
-  void _updateMarkers() {
+  Future<Uint8List> getBytesFromAsset(String path, int width) async {
+    ByteData data = await rootBundle.load(path);
+    ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List(), targetWidth: width);
+    ui.FrameInfo fi = await codec.getNextFrame();
+    return (await fi.image.toByteData(format: ui.ImageByteFormat.png))!.buffer.asUint8List();
+  }
+
+  void _updateMarkers() async {
+    BitmapDescriptor startIcon;
+
+    if (selectedVehicleIcon.value.isNotEmpty) {
+      try {
+        // 100-120 width standard Google Maps car size mate perfect che
+        final Uint8List markerIcon = await getBytesFromAsset(selectedVehicleIcon.value, 120);
+        startIcon = BitmapDescriptor.fromBytes(markerIcon);
+      } catch (e) {
+        startIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+      }
+    } else {
+      startIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+    }
+
     markers.value = {
-      if (start != null && !isNavigating.value)
-        Marker(
-          markerId: const MarkerId("start"),
-          position: start!,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        ),
+      Marker(
+        markerId: const MarkerId("start"),
+        position: start!,
+        icon: startIcon,
+        anchor: const Offset(0.5, 0.5),
+        rotation: 0, // Jyare navigation chalu thase tyare heading pramane badlase
+      ),
       if (end != null)
         Marker(
           markerId: const MarkerId("end"),
@@ -188,6 +243,11 @@ class TwoMapRouteController extends GetxController {
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         ),
     };
+  }
+
+  void updateVehicleIcon(String assetPath) {
+    selectedVehicleIcon.value = assetPath;
+    _updateMarkers();
   }
 
   Future<void> setPointFromAddress(String address, bool isStart) async {
