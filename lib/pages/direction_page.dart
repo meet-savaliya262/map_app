@@ -298,15 +298,9 @@ class _DirectionPageState extends State<DirectionPage> {
                           ),
                           onPressed: () async {
                             if (startController.text.isNotEmpty && endController.text.isNotEmpty) {
-                              if (startController.text == "Your Location") {
-                              } else {
-                                await twomap.setPointFromAddress(startController.text, true);
-                              }
-
-                              if (endController.text == "Your Location") {
-                              } else {
-                                await twomap.setPointFromAddress(endController.text, false);
-                              }
+                              twomap.polylines.clear();
+                              await twomap.setPointFromAddress(startController.text, true);
+                              await twomap.setPointFromAddress(endController.text, false);
                               _tileController.collapse();
                             }
                           },
@@ -351,12 +345,12 @@ class _DirectionPageState extends State<DirectionPage> {
                     children: [
 
                       Align(
-                        alignment:AlignmentGeometry.topRight,
+                        alignment: Alignment.topRight,
                         child: IconButton(
                           icon: const Icon(Icons.settings),
                           onPressed: () {
                             Get.bottomSheet(
-                                VehicleSelectorSheet());
+                                const VehicleSelectorSheet());
                           },
                         ),
                       ),

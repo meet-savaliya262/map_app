@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:get/Get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../constant/colorconstant.dart';
 import '../controller/map_two_locationController.dart';
@@ -86,7 +85,7 @@ class _VehicleSelectorSheetState
                         duration: const Duration(milliseconds: 300),
                         scale: isSelected ? 1.2 : 0.9,
                         child: Image.asset(
-                          vehicles[index].replaceAll(".svg", ".png"),
+                          vehicles[index],
                           height: 50,
                           errorBuilder: (context, error, stackTrace) => const Icon(Icons.directions_car),
                         ),
