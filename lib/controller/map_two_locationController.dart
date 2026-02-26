@@ -20,8 +20,6 @@ class TwoMapRouteController extends GetxController {
   RxString selectedMode = "driving".obs;
   RxString distanceText = "".obs;
   RxString durationText = "".obs;
-
-  // નેવિગેશન માટેના વેરીએબલ
   RxBool isNavigating = false.obs;
   StreamSubscription<Position>? positionStream;
 
@@ -33,8 +31,6 @@ class TwoMapRouteController extends GetxController {
     if (start == null || end == null) return;
 
     String transitParams = selectedMode.value == "transit" ? "&departure_time=now" : "";
-
-    // API URL માં 'region=in' અને 'units=metric' રાખવું જેથી સચોટ ડેટા મળે
     final url = "https://maps.googleapis.com/maps/api/directions/json?"
         "origin=${start!.latitude},${start!.longitude}"
         "&destination=${end!.latitude},${end!.longitude}"
